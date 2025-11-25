@@ -1,0 +1,10 @@
+[project]
+name = "NetOne"
+version = "0.1.0"
+description = "NetOne is a lightweight, cross-vendor network automation toolkit designed to collect essential operational data from network devices using a unified Python interface."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "netmiko>=4.6.0",
+    "paramiko>=4.0.0",
+]
