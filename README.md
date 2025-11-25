@@ -4,6 +4,11 @@ NetOne is a lightweight, cross-vendor network automation toolkit designed to col
 
 The goal of NetOne is to simplify network monitoring and automation without requiring full-scale frameworks like Ansible or Nornir. Instead, it provides a clean, object-oriented Python API suitable for small-to-medium automation tasks and troubleshooting automation.
 
+## Supported Network Operating Systems
+
+* Cisco IOS
+* MikroTik RouterOS
+
 ## Getting Started
 
 Project was created with [UV](https://github.com/astral-sh/uv) which is fast Python package and project manager.
