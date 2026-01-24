@@ -24,10 +24,10 @@ class IOSDriver(NetworkDriver):
                 "port": self.port
             })
         except NetmikoTimeoutException as _:
-            print("Connection failed: the hostname or IP address is incorrect or please check the port number and any firewall settings.", file=sys.stderr)
+            print("Connection failed: the hostname or IP address is incorrect or please check the port number and any firewall settings.")
             sys.exit(1)
         except NetMikoAuthenticationException as _:
-            print("Authentication failed: Please verify your username and password. ")
+            print("Authentication failed: Please verify your username and password.")
             sys.exit(1)
 
     def get_running_config(self) -> str:
@@ -37,9 +37,14 @@ class IOSDriver(NetworkDriver):
         interfaces: list[IPInterface] = []
 
         output = self.ssh_client.send_command("sh ip int br")
-        for line in output.split("\n")[2:]:
-            interface, ip_address, _, _, status, protocol = line.split()
-            interfaces.append(IPInterface(interface, ip_address, status, protocol))
+        for line in output.split("\n")[1:]:
+            if "administratively" in line:
+                interface, ip_address, _, _, _, status, protocol = line.split()
+                status = f"administratively {status}"
+                interfaces.append(IPInterface(interface, ip_address, status, protocol))
+            else:
+                interface, ip_address, _, _, status, protocol = line.split()
+                interfaces.append(IPInterface(interface, ip_address, status, protocol))
 
         return interfaces
     
@@ -58,7 +63,7 @@ class IOSDriver(NetworkDriver):
 
         output = self.ssh_client.send_command("sh mac address-table")
 
-        for line in output.split()[5:-1]:
+        for line in output.split("\n")[5:-1]:
             _, mac_address, type, port = line.split()
             mac_address_table.append(MacAddressEntry(unify_mac_address(mac_address), type, port))
 
@@ -83,13 +88,13 @@ class IOSDriver(NetworkDriver):
             cdp_output = self.ssh_client.send_command("show cdp neighbors detail")
             return self.__parse_cdp_neighbors(cdp_output)
         
-        cdp_status = self.ssh_client.send_command("show lldp")
+        lldp_status = self.ssh_client.send_command("show lldp")
 
-        if "LLDP is not enabled" not in cdp_status:
-            cdp_output = self.ssh_client.send_command("show lldp neighbors detail")
-            return self.__parse_lldp_neighbors(cdp_output)
+        if "LLDP is not enabled" not in lldp_status:
+            lldp_output = self.ssh_client.send_command("show lldp neighbors detail")
+            return self.__parse_lldp_neighbors(lldp_output)
         
-        print("No CDP or LLDP is enabled!", file=sys.stderr)
+        print("No CDP or LLDP is enabled!")
         return []
     
     def __parse_cdp_neighbors(self, output: str) -> list[NeighborEntry]:
@@ -156,7 +161,7 @@ class IOSDriver(NetworkDriver):
         return True
     
     def exec_command(self, command: str) -> str:
-        if "show" in command:
+        if "show" in command or "sh" in command:
             return self.ssh_client.send_command(command)
         
         return self.ssh_client.send_config_set([command])
