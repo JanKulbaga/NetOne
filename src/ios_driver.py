@@ -37,7 +37,7 @@ class IOSDriver(NetworkDriver):
         interfaces: list[IPInterface] = []
 
         output = self.ssh_client.send_command("sh ip int br")
-        for line in output.split()[2:]:
+        for line in output.split("\n")[2:]:
             interface, ip_address, _, _, status, protocol = line.split()
             interfaces.append(IPInterface(interface, ip_address, status, protocol))
 
