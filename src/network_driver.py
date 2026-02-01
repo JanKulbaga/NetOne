@@ -1,4 +1,4 @@
-from src.model import ArpEntry, IPInterface, MacAddressEntry, VlanEntry, NeighborEntry
+from src.model import ArpEntry, IPInterface, MacAddressEntry, VlanEntry, NeighborEntry, LacpGroup
 
 from typing import Protocol
 
@@ -32,6 +32,12 @@ class NetworkDriver(Protocol):
         ...
 
     def exec_command(self, command: str) -> str:
+        ...
+
+    def get_lacp_groups(self) -> list[LacpGroup]:
+        ...
+
+    def get_lacp_group(self, group_name: str) -> LacpGroup | None:
         ...
 
     def close(self) -> None:

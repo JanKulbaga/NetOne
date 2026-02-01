@@ -1,4 +1,4 @@
-from src.model import ArpEntry, IPInterface, MacAddressEntry, VlanEntry, NeighborEntry
+from src.model import ArpEntry, IPInterface, MacAddressEntry, VlanEntry, NeighborEntry, LacpGroup
 from src.network_driver import NetworkDriver
 from src.util import unify_mac_address
 
@@ -28,13 +28,13 @@ class RouterOS7Driver(NetworkDriver):
                 port=self.port
             )
         except AuthenticationException as _:
-            print("Authentication failed: Please verify your username and password.", file=sys.stderr)
+            print("Authentication failed: Please verify your username and password.")
             sys.exit(1)
         except NoValidConnectionsError as _:
-            print("Connection failed: Unable to connect to the SSH port. Check the port number and any firewall settings.", file=sys.stderr)
+            print("Connection failed: Unable to connect to the SSH port. Check the port number and any firewall settings.")
             sys.exit(1)
         except TimeoutError as _:
-            print("Timeout error: The host is unreachable or the IP address might be incorrect.", file=sys.stderr)
+            print("Timeout error: The host is unreachable or the IP address might be incorrect.")
             sys.exit(1)
 
     def get_running_config(self) -> str:
@@ -108,7 +108,7 @@ class RouterOS7Driver(NetworkDriver):
         _, stdout, _ = self.ssh_client.exec_command("/interface vlan print")
         output = stdout.read().decode().strip()
         if len(output) == 0:
-            print("No Vlans are configured!", file=sys.stderr)
+            print("No Vlans are configured!")
             return vlans
         
         pattern = re.compile(
@@ -128,7 +128,7 @@ class RouterOS7Driver(NetworkDriver):
         _, stdout, _ = self.ssh_client.exec_command("/ip neighbor print detail")
         output = stdout.read().decode().strip()
         if len(output) == 0:
-            print("No CDP or LLDP is enabled!", file=sys.stderr)
+            print("No CDP or LLDP is enabled!")
             return neighbors
         
         pattern = re.compile(
@@ -165,6 +165,52 @@ class RouterOS7Driver(NetworkDriver):
         _, stdout, _ = self.ssh_client.exec_command(command)
         output = stdout.read().decode().strip()
         return output
+
+    def get_lacp_groups(self) -> list[LacpGroup]:
+        number_of_groups = self.exec_command("/interface bonding print count-only")
+        if int(number_of_groups) == 0:
+            print("No LACP groups found on device.")
+            return []
+        
+        lacp_groups: list[LacpGroup] = []
+
+        output = self.exec_command("/interface bonding print")
+
+        lines = []
+        buffer = ""
+        for line in output.splitlines():
+            stripped = line.strip()
+            if re.match(r'^\d+\s*[RX]?', stripped):
+                if buffer:
+                    lines.append(buffer)
+                buffer = stripped
+            else:
+                buffer += f" {stripped}"
+        if buffer:
+            lines.append(buffer)
+
+        pattern = re.compile(
+            r'^(?:\d+\s+)?(?P<status>[RX]?)\s.*?name="(?P<name>[^"]+)"[^"]*slaves=(?P<slaves>\S+)[^"]*mode=(?P<mode>\S+)',
+        )
+
+        for line in lines:
+            matched_line = pattern.search(line)
+            if not matched_line:
+                continue
+            state = "running" if matched_line.group("status") == "R" else "disabled"
+            name = matched_line.group("name")
+            members = matched_line.group("slaves").split()
+            mode = matched_line.group("mode")
+            lacp_groups.append(LacpGroup(name, mode, state, members))
+
+        return lacp_groups
+    
+    def get_lacp_group(self, group_name: str) -> LacpGroup | None:
+        lacp_groups = self.get_lacp_groups()
+        for group in lacp_groups:
+            if group.name == group_name:
+                return group
+        return None
 
     def close(self) -> None:
         self.ssh_client.close()

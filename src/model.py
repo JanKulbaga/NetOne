@@ -30,3 +30,10 @@ class NeighborEntry:
 class ArpEntry:
     ip_address: str
     mac_address: str
+
+@dataclass
+class LacpGroup:
+    name: str
+    mode: str
+    state: str
+    members: list[str]

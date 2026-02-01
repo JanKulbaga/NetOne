@@ -1,5 +1,5 @@
 from src.network_driver import NetworkDriver
-from src.model import ArpEntry, IPInterface, MacAddressEntry, VlanEntry, NeighborEntry
+from src.model import ArpEntry, IPInterface, MacAddressEntry, VlanEntry, NeighborEntry, LacpGroup
 from src.util import unify_mac_address
 
 import sys
@@ -165,6 +165,37 @@ class IOSDriver(NetworkDriver):
             return self.ssh_client.send_command(command)
         
         return self.ssh_client.send_config_set([command])
+    
+    def get_lacp_groups(self) -> list[LacpGroup]:
+        output = self.exec_command("sh etherchannel summary")
+
+        _, number_of_groups = output.split("\n")[12].split(": ")
+        if int(number_of_groups) == 0:
+            print("No LACP groups found on device.")
+            return []
+
+        lacp_groups: list[LacpGroup] = []
+        output = self.exec_command("sh etherchannel summary")
+        for line in output.split("\n")[-2:]:
+            if not line:
+                continue
+            parts = [p for p in line.split() if p]
+            name_match = re.match(r'(\w+)', parts[1])
+            name = name_match.group(1)
+            mode = parts[2]
+            state = "running" if parts[1][-2] == "U" else "disabled"
+            members = [member[:-3] for member in parts[3:] if len(parts) > 3]
+            lacp_groups.append(LacpGroup(name, mode, state, members))
+
+        return lacp_groups
+
+    def get_lacp_group(self, group_name: str) -> LacpGroup | None:
+        lacp_groups = self.get_lacp_groups()
+        for group in lacp_groups:
+            if group.name == group_name:
+                return group
+        return None
+
 
     def close(self) -> None:
         self.ssh_client.disconnect()
